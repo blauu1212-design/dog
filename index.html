@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>랜덤 강아지 사진 뷰어</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans KR & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', 'Inter', sans-serif;
+        }
+        /* 이미지 페이드인 애니메이션 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-100 min-h-screen flex flex-col items-center justify-center p-4 selection:bg-amber-200">
+
+    <!-- 상단 정보 위젯 바 (날씨, 시계, 달력) -->
+    <section aria-label="날씨, 시계, 달력 위젯" class="w-full max-w-md mb-4 grid grid-cols-3 gap-2.5">
+        
+        <!-- 1. 날씨 위젯 -->
+        <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-md border border-amber-100 p-3 flex flex-col items-center justify-center text-center">
+            <div class="flex items-center gap-1 text-xs font-medium text-gray-500 mb-1">
+                <span id="weather-icon" class="text-base">🌤️</span>
+                <span id="weather-location" class="truncate max-w-[65px]">서울</span>
+            </div>
+            <div id="weather-temp" class="text-lg font-bold text-gray-800 leading-tight">--°C</div>
+            <div id="weather-desc" class="text-[11px] text-amber-700 font-medium mt-0.5 truncate w-full">불러오는 중</div>
+        </div>
+
+        <!-- 2. 실시간 시계 위젯 -->
+        <div class="bg-white/90 backdrop-blur-md rounded-2xl shadow-md border border-amber-100 p-3 flex flex-col items-center justify-center text-center">
+            <div class="text-[11px] font-semibold text-amber-600 uppercase tracking-wider mb-0.5" id="clock-ampm">AM</div>
+            <div id="clock-time" class="text-lg font-bold text-gray-800 tracking-tight tabular-nums leading-tight">00:00</div>
+            <div id="clock-seconds" class="text-[11px] text-gray-400 font-medium tabular-nums mt-0.5">00초</div>
+        </div>
+
+        <!-- 3. 달력 위젯 (클릭 시 미니 달력 팝오버 토글) -->
+        <div class="relative">
+            <button id="calendar-toggle-btn" type="button" title="클릭하여 월간 달력 보기" class="w-full h-full bg-white/90 hover:bg-amber-50/90 backdrop-blur-md rounded-2xl shadow-md border border-amber-100 p-3 flex flex-col items-center justify-center text-center transition-colors cursor-pointer">
+                <div id="cal-month" class="text-[11px] font-semibold text-amber-600 mb-0.5">11월</div>
+                <div id="cal-date" class="text-lg font-bold text-gray-800 leading-tight">17일</div>
+                <div id="cal-day" class="text-[11px] text-gray-500 font-medium mt-0.5">화요일 ▾</div>
+            </button>
+
+            <!-- 미니 월간 달력 드롭다운 -->
+            <div id="mini-calendar-popover" class="hidden absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-amber-100 p-4 z-30 text-left">
+                <div class="flex items-center justify-between mb-3">
+                    <button id="prev-month-btn" type="button" class="p-1.5 rounded-lg hover:bg-amber-100 text-gray-600 text-xs font-bold cursor-pointer">◀</button>
+                    <span id="popover-month-year" class="text-sm font-bold text-gray-800">2026년 11월</span>
+                    <button id="next-month-btn" type="button" class="p-1.5 rounded-lg hover:bg-amber-100 text-gray-600 text-xs font-bold cursor-pointer">▶</button>
+                </div>
+                <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-gray-400 mb-1">
+                    <span class="text-red-400">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="text-blue-400">토</span>
+                </div>
+                <div id="calendar-days-grid" class="grid grid-cols-7 gap-1 text-center text-xs">
+                    <!-- 자바스크립트로 날짜 렌더링 -->
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- 메인 컨테이너 -->
+    <main class="w-full max-w-md bg-white/90 backdrop-blur-md rounded-3xl shadow-xl border border-amber-100 p-6 sm:p-8 flex flex-col items-center text-center transition-all">
+        
+        <!-- 상단 타이틀 영역 -->
+        <header class="mb-6">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-100 text-2xl mb-3 shadow-inner">
+                🐶
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">
+                오늘의 귀여운 강아지
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">
+                버튼을 눌러 새로운 강아지 친구를 만나보세요!
+            </p>
+        </header>
+
+        <!-- 가운데 강아지 사진 상자 -->
+        <div id="image-box" class="relative w-full aspect-square bg-amber-50/70 rounded-2xl overflow-hidden border-2 border-dashed border-amber-200 flex items-center justify-center shadow-inner mb-6 group">
+            
+            <!-- 로딩 스피너 (데이터를 불러올 때 표시) -->
+            <div id="loader" class="hidden absolute inset-0 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center z-10">
+                <div class="w-10 h-10 border-4 border-amber-200 border-t-amber-500 rounded-full animate-spin mb-2"></div>
+                <span class="text-xs font-medium text-amber-700">강아지 불러오는 중...</span>
+            </div>
+
+            <!-- 강아지 이미지 -->
+            <img 
+                id="dog-image" 
+                src="" 
+                alt="귀여운 강아지 사진" 
+                class="w-full h-full object-cover hidden transition-transform duration-500 group-hover:scale-105"
+                onerror="handleImageError()"
+            />
+
+            <!-- 초기 안내 또는 에러 메시지 표시 영역 -->
+            <div id="placeholder-msg" class="p-6 text-gray-400 flex flex-col items-center">
+                <span class="text-4xl mb-2">🐾</span>
+                <p class="text-sm">사진을 준비하고 있습니다...</p>
+            </div>
+        </div>
+
+        <!-- 견종 표시 뱃지 (API URL에서 추출) -->
+        <div id="breed-badge" class="hidden mb-6 px-3.5 py-1 bg-amber-100/80 text-amber-800 text-xs font-semibold rounded-full tracking-wide uppercase">
+            견종 정보
+        </div>
+
+        <!-- 상자 아래 "새로운 강아지 보기" 버튼 -->
+        <button 
+            id="fetch-btn" 
+            type="button"
+            class="w-full py-3.5 px-6 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold text-base sm:text-lg rounded-2xl shadow-lg shadow-amber-500/30 hover:shadow-amber-500/40 transform active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+            <span>새로운 강아지 보기</span>
+            <span class="text-xl">🐕</span>
+        </button>
+
+    </main>
+
+    <!-- 하단 출처 표기 -->
+    <footer class="mt-6 text-xs text-gray-400">
+        Powered by <a href="https://dog.ceo/dog-api/" target="_blank" rel="noopener noreferrer" class="underline hover:text-amber-600 transition-colors">Dog CEO API</a>
+    </footer>
+
+    <script>
+        // DOM 요소 선택
+        const dogImage = document.getElementById('dog-image');
+        const fetchBtn = document.getElementById('fetch-btn');
+        const loader = document.getElementById('loader');
+        const placeholderMsg = document.getElementById('placeholder-msg');
+        const breedBadge = document.getElementById('breed-badge');
+
+        // Dog CEO 랜덤 강아지 API 엔드포인트
+        const API_URL = 'https://dog.ceo/api/breeds/image/random';
+
+        /**
+         * 이미지 URL에서 견종 이름을 추출하여 깔끔하게 포맷팅하는 함수
+         * 예: https://images.dog.ceo/breeds/retriever-golden/n02099601_100.jpg -> Golden Retriever
+         */
+        function extractBreedName(url) {
+            try {
+                const parts = url.split('/breeds/');
+                if (parts.length > 1) {
+                    const breedPart = parts[1].split('/')[0];
+                    // 하이픈(-)으로 연결된 경우 순서를 뒤집어 읽기 좋게 변환 (예: hound-afghan -> Afghan Hound)
+                    const words = breedPart.split('-').reverse();
+                    return words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                }
+            } catch (e) {
+                console.error('견종 파싱 오류:', e);
+            }
+            return 'Cute Dog';
+        }
+
+        /**
+         * 이미지 로드 실패 시 대체 처리 함수
+         */
+        function handleImageError() {
+            loader.classList.add('hidden');
+            dogImage.classList.add('hidden');
+            placeholderMsg.classList.remove('hidden');
+            placeholderMsg.innerHTML = `
+                <span class="text-3xl mb-2">😢</span>
+                <p class="text-sm text-red-500 font-medium">사진을 불러오지 못했습니다.<br>다시 시도해 주세요!</p>
+            `;
+            fetchBtn.disabled = false;
+        }
+
+        /**
+         * Dog API를 호출하여 새로운 강아지 사진을 가져오는 비동기 함수
+         */
+        async function fetchNewDog() {
+            // UI 로딩 상태로 전환
+            fetchBtn.disabled = true;
+            loader.classList.remove('hidden');
+            dogImage.classList.remove('fade-in');
+
+            try {
+                const response = await fetch(API_URL);
+                
+                // HTTP 응답 상태 확인
+                if (!response.ok) {
+                    throw new Error(`HTTP 오류! 상태 코드: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // API 응답 성공 여부 확인
+                if (data.status === 'success' && data.message) {
+                    const imageUrl = data.message;
+                    
+                    // 이미지가 브라우저에 완전히 다운로드된 후 화면에 표시
+                    dogImage.onload = () => {
+                        loader.classList.add('hidden');
+                        placeholderMsg.classList.add('hidden');
+                        dogImage.classList.remove('hidden');
+                        dogImage.classList.add('fade-in');
+
+                        // 견종 뱃지 업데이트
+                        const breedName = extractBreedName(imageUrl);
+                        breedBadge.textContent = `🐶 ${breedName}`;
+                        breedBadge.classList.remove('hidden');
+
+                        // 버튼 재활성화
+                        fetchBtn.disabled = false;
+                    };
+
+                    // 이미지 소스 할당 (onload 트리거)
+                    dogImage.src = imageUrl;
+                } else {
+                    throw new Error('올바르지 않은 API 응답 형식입니다.');
+                }
+
+            } catch (error) {
+                console.error('강아지 사진을 가져오는 중 오류 발생:', error);
+                handleImageError();
+            }
+        }
+
+        // 버튼 클릭 이벤트 리스너 등록
+        fetchBtn.addEventListener('click', fetchNewDog);
+
+        // ==========================================
+        // 상단 위젯 기능 (시계, 달력, 날씨)
+        // ==========================================
+
+        // 1. 실시간 시계 & 오늘 날짜 업데이트
+        const daysKor = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+        function updateClockAndDate() {
+            const now = new Date();
+            const hours24 = now.getHours();
+            const ampm = hours24 >= 12 ? 'PM' : 'AM';
+            const hours12 = hours24 % 12 || 12;
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+
+            document.getElementById('clock-ampm').textContent = ampm;
+            document.getElementById('clock-time').textContent = `${String(hours12).padStart(2, '0')}:${minutes}`;
+            document.getElementById('clock-seconds').textContent = `${seconds}초`;
+
+            document.getElementById('cal-month').textContent = `${now.getMonth() + 1}월`;
+            document.getElementById('cal-date').textContent = `${now.getDate()}일`;
+            document.getElementById('cal-day').textContent = `${daysKor[now.getDay()]} ▾`;
+        }
+
+        // 2. 미니 월간 달력 로직
+        let viewDate = new Date();
+        const calToggleBtn = document.getElementById('calendar-toggle-btn');
+        const calPopover = document.getElementById('mini-calendar-popover');
+        const calGrid = document.getElementById('calendar-days-grid');
+        const popoverTitle = document.getElementById('popover-month-year');
+
+        function renderCalendar(dateObj) {
+            const year = dateObj.getFullYear();
+            const month = dateObj.getMonth();
+            popoverTitle.textContent = `${year}년 ${month + 1}월`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+
+            calGrid.innerHTML = '';
+
+            // 빈 칸 채우기
+            for (let i = 0; i < firstDay; i++) {
+                calGrid.innerHTML += `<div></div>`;
+            }
+
+            // 날짜 채우기
+            for (let d = 1; d <= lastDate; d++) {
+                const isToday = (year === today.getFullYear() && month === today.getMonth() && d === today.getDate());
+                const dayOfWeek = (firstDay + d - 1) % 7;
+                let colorClass = 'text-gray-700 hover:bg-amber-50';
+                if (dayOfWeek === 0) colorClass = 'text-red-500 hover:bg-red-50';
+                if (dayOfWeek === 6) colorClass = 'text-blue-500 hover:bg-blue-50';
+
+                const activeClass = isToday 
+                    ? 'bg-amber-500 text-white font-bold hover:bg-amber-600 shadow-xs' 
+                    : colorClass;
+
+                calGrid.innerHTML += `<div class="py-1 rounded-lg ${activeClass}">${d}</div>`;
+            }
+        }
+
+        calToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            calPopover.classList.toggle('hidden');
+            if (!calPopover.classList.contains('hidden')) {
+                renderCalendar(viewDate);
+            }
+        });
+
+        document.getElementById('prev-month-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            viewDate.setMonth(viewDate.getMonth() - 1);
+            renderCalendar(viewDate);
+        });
+
+        document.getElementById('next-month-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            viewDate.setMonth(viewDate.getMonth() + 1);
+            renderCalendar(viewDate);
+        });
+
+        // 바깥 영역 클릭 시 달력 닫기
+        document.addEventListener('click', (e) => {
+            if (!calPopover.contains(e.target) && !calToggleBtn.contains(e.target)) {
+                calPopover.classList.add('hidden');
+            }
+        });
+
+        // 3. Open-Meteo 무료 날씨 API 연동
+        function getWeatherInfo(code) {
+            if (code === 0) return { icon: '☀️', desc: '맑음' };
+            if (code >= 1 && code <= 3) return { icon: '⛅', desc: '구름 조금' };
+            if (code === 45 || code === 48) return { icon: '🌫️', desc: '안개' };
+            if (code >= 51 && code <= 67) return { icon: '🌧️', desc: '비' };
+            if (code >= 71 && code <= 77) return { icon: '❄️', desc: '눈' };
+            if (code >= 80 && code <= 82) return { icon: '🌦️', desc: '소나기' };
+            if (code >= 95) return { icon: '⛈️', desc: '뇌우' };
+            return { icon: '🌤️', desc: '보통' };
+        }
+
+        async function loadWeather(lat = 37.5665, lon = 126.9780, locName = '서울') {
+            try {
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+                const data = await res.json();
+                if (data.current_weather) {
+                    const temp = Math.round(data.current_weather.temperature);
+                    const info = getWeatherInfo(data.current_weather.weathercode);
+                    document.getElementById('weather-icon').textContent = info.icon;
+                    document.getElementById('weather-location').textContent = locName;
+                    document.getElementById('weather-temp').textContent = `${temp}°C`;
+                    document.getElementById('weather-desc').textContent = info.desc;
+                }
+            } catch (err) {
+                document.getElementById('weather-desc').textContent = '날씨 오류';
+            }
+        }
+
+        function initWeather() {
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => loadWeather(pos.coords.latitude, pos.coords.longitude, '현재 위치'),
+                    () => loadWeather() // 위치 권한 거부 시 서울 기본값 사용
+                );
+            } else {
+                loadWeather();
+            }
+        }
+
+        // 페이지 최초 로드 시 실행
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchNewDog();
+            updateClockAndDate();
+            setInterval(updateClockAndDate, 1000);
+            initWeather();
+        });
+    </script>
+</body>
+</html>
